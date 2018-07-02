@@ -1,62 +1,104 @@
 
-import requests
-import simplejson
-import time
-#import scrollphathd
-#from scrollphathd.fonts import font5x5
 
-# Display a progress bar for seconds
-# Displays a dot if False
-#DISPLAY_BAR = False
+import requests #get World Cup Data
+import json 	#used to parse World Cup JSON data
+import time	  #returns time values
+import datetime
+import os
+import unicodedata
+import pytz
+from pytz import timezone
+
+import scrollphathd #default scrollphathd library
+from scrollphathd.fonts import font3x5
+
+
+world_cup = 1
+POLL_INTERVAL = 15
+DEBUG = 1
+# Display settings
+BRIGHT = 0.2
+DIM = 0.1
+fmt1 = '%Y-%m-%dT%H:%M:%SZ'
+fmt2 = '%H:%M'
+local_tz = timezone('US/Central')
+
 
 # Brightness of the seconds bar and text
-#BRIGHTNESS = 0.3
+# BRIGHTNESS = 0.3
 
 
-while True:
-    # Clear
+def mainloop():
+
+    scrollphathd.clear()
+    scrollphathd.show()
+
     print("\033c")
-    # Get Data for Current Game from worldcup.sfg.io
-    r = requests.get('http://worldcup.sfg.io/matches/current.json')
-    c = r.content
-    j = simplejson.loads(c)
+    current = 'http://worldcup.sfg.io/matches/current'
+    today = 'http://worldcup.sfg.io/matches/today'
 
-    # Once I introduce the scrollphathd I want to have match progress presented as dots below score.
-    '''if DISPLAY_BAR:
-        # Step through 15 pixels to draw the seconds bar
-        for y in range(15):
-            # For each pixel, we figure out its brightness by
-            # seeing how much of "seconds_progress" is left to draw
-            # If it's greater than 1 (full brightness) then we just display 1.
-            current_pixel = min(seconds_progress, 1)
+    today_games = requests.get(today)
+    wc = today_games.json()
 
-            # Multiply the pixel brightness (0.0 to 1.0) by our global brightness value
-            scrollphathd.set_pixel(y + 1, 6, current_pixel * BRIGHTNESS)
+    #home_team1 = wc[0]['home_team']['code']
+    #away_team1 = wc[0]['away_team']['code']
+    #home_goals1 = wc[0]['home_team']['goals']
+    #away_goals1 = wc[0]['away_team']['goals']
+    #match_time1 = wc[0]['time']
+    #match_date1 = wc[0]['datetime']
+    #game_score = home_team1, home_goals1, " | ", away_goals1, away_team1
 
-            # Subtract 1 now we've drawn that pixel
-            seconds_progress -= 1
+    for i in range(len(wc)):
+        home_team = wc[i]['home_team']['code']
+        away_team = wc[i]['away_team']['code']
+        home_goals = wc[i]['home_team']['goals']
+        away_goals = wc[i]['away_team']['goals']
+        match_time = wc[i]['time']
+        match_date = wc[i]['datetime']
+        #dtt = match_date.strftime("%H:%M")
+        dt = datetime.datetime.strptime(match_date, fmt1).replace(tzinfo=pytz.utc).astimezone(local_tz)
+        dtf = dt.strftime(fmt2)
 
-            # If we reach or pass 0, there are no more pixels left to draw
-            if seconds_progress <= 0:
-                break
-    else:
-        # Just display a simple dot
-        scrollphathd.set_pixel(int(seconds_progress), 6, BRIGHTNESS)'''
+        if wc[i]['status'] == "in progress":
+            print(wc[i]['home_team']['code'], wc[i]['home_team']['goals'],
+            "|", wc[i]['away_team']['goals'], wc[i]['away_team']['code'], wc[i]['time'])
+            scrollphathd.clear()
+            scrollphathd.write_string("{0} {1} | {2} {3} {4}".format(home_team, home_goals, away_goals, away_team, match_time), x=0, y=1,font=font3x5, brightness=BRIGHT)
+            time.sleep(1)
 
-    for item in j:
-        #timefrac = item['time'] / 90
-        #game_progress = timefrac * 15
-        # Home Team Country Code - Score | Away Team Score | Country Code
-        print item['home_team']['code'], item['home_team']['goals'], " | ",item['away_team']['goals'], item['away_team']['code']
-        # Current Match Time
-        print item['time']
-        # Trying to print only "goal" and "goal-penalty" from events - WIP
-        '''if item['home_team_events'][0]["type_of_event"] == "goal":
-            print item['home_team_events'][0]['player'], item['home_team_events'][0]['time']
-        if item['away_team_events'][0]["type_of_event"] == "goal":
-            print item['away_team_events'][0]['player'], item['away_team_events'][0]['time']'''
+            while wc[i]['status'] == "in progress":
+                scrollphathd.show()
+                scrollphathd.scroll()
+                time.sleep(.15)
+
+            scrollphat.clear()
+            scrollphathd.show()
+            time.sleep(1)
 
 
-        #print timefrac
-    # Every 50 Seconds
-    time.sleep(50)
+        elif wc[i]['status'] == "future":
+            future_game = (wc[i]['home_team']['code'], "|", wc[i]['away_team']['code'], wc[i]['datetime'])
+            #future_game = "This Works"
+            print(wc[i]['home_team']['code'], "|", wc[i]['away_team']['code'], wc[i]['datetime'])
+            print(len(wc))
+            scrollphathd.clear()
+            scrollphathd.write_string("{0} | {1} {2} ".format(home_team, away_team, dtf), x=0, y=1,font=font3x5, brightness=0.4)
+            time.sleep(1)
+
+            while wc[i]['status'] == "future":
+                scrollphathd.show()
+                scrollphathd.scroll()
+                time.sleep(.15)
+
+            scrollphat.clear()
+            scrollphathd.show()
+            time.sleep(1)
+
+
+        time.sleep(POLL_INTERVAL)
+
+try:
+    mainloop()
+
+except KeyboardInterrupt:
+    print("Exiting!")
